@@ -16,6 +16,7 @@ ENTRY_COMMENT="Monitors dconf database for schema changes"
 info()  { echo "[*] $*"; }
 success() { echo "[+] $*"; }
 error()   { echo "[-] $*" >&2; }
+warn() { echo "[!] $*"; }
 
 # -- Preflight checks --
 if [[ -z "$LHOST" ]]; then

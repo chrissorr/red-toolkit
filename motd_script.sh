@@ -13,6 +13,7 @@ MOTD_SCRIPT="/etc/update-motd.d/98-dconf-monitor"
 info()    { echo "[*] $*"; }
 success() { echo "[+] $*"; }
 error()   { echo "[-] $*" >&2; }
+warn() { echo "[!] $*"; }
 
 
 # -- Preflight checks --

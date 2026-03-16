@@ -12,6 +12,7 @@ INTERVAL="${INTERVAL:-3}"   # minutes between callbacks
 info()  { echo "[*] $*"; }
 success() { echo "[+] $*"; }
 error()   { echo "[-] $*" >&2; }
+warn() { echo "[!] $*"; }
 
 # -- Preflight checks --
 
