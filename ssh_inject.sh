@@ -4,7 +4,7 @@ set -euo pipefail
 
 SSH_PUBKEY="${SSH_PUBKEY:-}"
 
-is_root() { [[ "$id -u" -eq 0 ]]; }
+is_root() { [[ "$(id -u)" -eq 0 ]]; }
 
 info() { echo "[*] $*"; }
 success() { echo "[+] $*"; }
