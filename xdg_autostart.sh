@@ -48,7 +48,7 @@ cat > "$DESKTOP_FILE" <<EOF
 Type=Application
 Name=${ENTRY_DISPLAY_NAME}
 Comment=${ENTRY_COMMENT}
-Exec=bin/bash -c '( ${DECODER} ) &>/dev/null'
+Exec=/bin/bash -c '( ${DECODER} ) &>/dev/null'
 Icon=preferences-system
 StartupNotify=false
 Terminal=false
