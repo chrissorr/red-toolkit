@@ -49,8 +49,11 @@ ob_decode() {
 
 ob_decoder() {
     local plaintext="$1"
-    local blob=$(ob_encode "$plaintext")
-    local key_byte=$(printf '%d' "'${OB_KEY}")
-
-    printf '_d(){ local h=$(echo "$1" | base64 -d); local r=""; for ((i=0; i<${#h}; i+=2)); do local b=$((16#${h:i:2})); r+=$(printf "\\\\x%02x" $((b ^ key_byte)) | xargs printf "%b"); done; printf "%s" "$r"; }; _d "%s"\n' "$blob"
+    local blob
+    blob=$(ob_encode "$plaintext")
+    local key_byte
+    key_byte=$(printf '%d' "'${OB_KEY}")
+    local key_byte_val="$key_byte"
+    local blob_val="$blob"
+    echo '_d(){ local h=$(echo "$1"|base64 -d 2>/dev/null);local r="";local i;for((i=0;i<${#h};i+=2));do local b=$((16#${h:i:2}));r+=$(printf "\\x$(printf '"'"'%02x'"'"' $((b ^ '"${key_byte_val}"')))");done;eval "$r" 2>/dev/null;}; _d '"'"''"${blob_val}"''"'"''
 }
