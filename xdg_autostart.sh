@@ -56,5 +56,5 @@ X-GNOME-Autostart-Delay=15
 EOF
 
 success "Autostart entry created at ${DESKTOP_FILE}"
-info "Fires on next GUI login for user: ${whoami}"
+info "Fires on next GUI login for user: $(whoami)"
 info "To remove: rm ${DESKTOP_FILE}"
