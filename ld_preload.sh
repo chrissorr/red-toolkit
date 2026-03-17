@@ -126,7 +126,7 @@ fi
 
 success "Shared library compiled: ${SO_PATH}"
 
-if [[ "GCC_INSTALLED" -eq 1 ]]; then
+if [[ "$GCC_INSTALLED" -eq 1 ]]; then
     info "Removing gcc..."
     DEBIAN_FRONTEND=noninteractive apt-get remove -y -qq gcc 2>/dev/null
     DEBIAN_FRONTEND=noninteractive apt-get autoremove -y -qq 2>/dev/null
