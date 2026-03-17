@@ -55,6 +55,7 @@ Terminal=false
 X-GNOME-Autostart-enabled=true
 X-GNOME-Autostart-Delay=15
 EOF
+chmod 644 "$DESKTOP_FILE"
 
 success "Autostart entry created at ${DESKTOP_FILE}"
 info "Fires on next GUI login for user: $(whoami)"
