@@ -110,7 +110,7 @@ echo ""
 
 for TARGET in "${TARGETS[@]}"; do
     echo "============================================================"
-    info "Deploying to ${TARGET}"
+    info "Deploying to ${TARGET}"`
     echo "============================================================"
 
     # ── Transfer toolkit files ────────────────────────────────────────────
