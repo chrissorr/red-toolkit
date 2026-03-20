@@ -32,15 +32,17 @@ set -uo pipefail
 # ── CONFIG — fill these in on comp day ───────────────────────────────────────
 
 TARGETS=(
-    "10.10.10.101"
-    "10.10.10.102"             # svc-redis-01
-    "10.10.10.103"             # svc-database-01
-    "10.10.10.104:wordpress"   # svc-amazin-01
-    "10.10.10.105"             # svc-samba-01
-    "10.10.10.106"
-    "10.10.10.107"
-    "10.10.10.108"
-    "10.10.10.109"
+     "192.168.75.129"
+     "192.168.75.132:wordpress"
+#    "10.10.10.101"
+#    "10.10.10.102"             # svc-redis-01
+#    "10.10.10.103"             # svc-database-01
+#    "10.10.10.104:wordpress"   # svc-amazin-01
+#    "10.10.10.105"             # svc-samba-01
+#    "10.10.10.106"
+#    "10.10.10.107"
+#    "10.10.10.108"
+#    "10.10.10.109"
 )
 
 TARGET_USER="target"
@@ -48,9 +50,9 @@ TARGET_PASS="targetvm"
 
 # Per-mechanism callback hosts — need to coordinate with before comp
 # Each should be a different red-kali IP
-LHOST_MOTD="10.10.10.151"        # teammate owning motd listener
-LHOST_LDPRELOAD="10.10.10.152"   # teammate owning ld_preload listener
-LHOST_WPCRON="10.10.10.153"      # teammate owning wp_cron listener (amazin-01 only)
+LHOST_MOTD="192.168.75.130"        # teammate owning motd listener
+LHOST_LDPRELOAD="192.168.75.130"   # teammate owning ld_preload listener
+LHOST_WPCRON="192.168.75.130"      # teammate owning wp_cron listener (amazin-01 only)
 
 LPORT="4444"   # ALL LISTENERS MUST USE SAME PORT
 
