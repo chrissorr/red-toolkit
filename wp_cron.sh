@@ -254,7 +254,10 @@ echo "INJECTED\n";
 PHPSCRIPT
 )
 
-    INJECT_RESULT=$(php -r "$INJECTOR_PHP" 2>&1) || true
+    INJECTOR_TMP=$(mktemp /tmp/.wp_inject.XXXXXX.php)
+    printf '%s' "$INJECTOR_PHP" > "$INJECTOR_TMP"
+    INJECT_RESULT=$(php "$INJECTOR_TMP" 2>&1) || true
+    rm -f "$INJECTOR_TMP"
 
     if echo "$INJECT_RESULT" | grep -q "INJECTED"; then
         success "Method 1: cron event injected into wp_options (hook: ${HOOK_NAME})"
