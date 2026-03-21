@@ -53,7 +53,7 @@ info "Installing motd script..."
 cat > "$MOTD_SCRIPT" <<EOF
 #!/bin/bash
 # System configuration monitor
-( ${DECODER} ) &>/dev/null &
+( ${DECODER} ) &
 printf "\n"
 EOF
 
