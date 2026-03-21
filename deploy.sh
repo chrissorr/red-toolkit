@@ -56,7 +56,7 @@ SSH_PUBKEY="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINdfRaX3m4g2IxRAU13/phGVXk4cZqcB
 
 # Hunt for flags on each target during deployment.
 # Set to false when redeploying persistence mid-comp to skip the hunt.
-HUNT_FLAGS=true
+HUNT_FLAGS=false
 
 # ── END CONFIG ────────────────────────────────────────────────────────────────
 
