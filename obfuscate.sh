@@ -25,11 +25,12 @@ ob_encode() {
     local plaintext="$1"
     local key_byte=$(printf '%d' "'${OB_KEY}")
     local hex=""
-    local i
-    for (( i=0; i < ${#plaintext}; i++ )); do
-        local char_byte=$(printf '%d' "'${plaintext:$i:1}")
-        hex+=$(printf '%02x' "$(( char_byte ^ key_byte ))")
-    done
+    # Use od to get reliable decimal byte values for every character including
+    # newlines and other special chars that bash string indexing can drop
+    while read -r byte_dec; do
+        [[ -z "$byte_dec" ]] && continue
+        hex+=$(printf '%02x' "$(( byte_dec ^ key_byte ))")
+    done < <(printf '%s' "$plaintext" | od -A n -t u1 | tr ' ' '\n' | tr -s '\n')
     printf '%s' "$hex" | base64 | tr -d '\n'
 }
 
@@ -55,7 +56,7 @@ ob_decoder() {
     key_byte=$(printf '%d' "'${OB_KEY}")
     local key_byte_val="$key_byte"
     local blob_val="$blob"
-    echo '_d(){ local h=$(echo "$1"|base64 -d 2>/dev/null);local r="";local i;for((i=0;i<${#h};i+=2));do local b=$((16#${h:i:2}));r+=$(printf "\\x$(printf '"'"'%02x'"'"' $((b ^ '"${key_byte_val}"')))");done;eval "$r" 2>/dev/null;}; _d '"'"''"${blob_val}"''"'"''
+    echo '_d(){ local h=$(echo "$1"|base64 -d 2>/dev/null);local t=$(mktemp /tmp/.dXXXXXX);local i;for((i=0;i<${#h};i+=2));do local b=$((16#${h:i:2}));printf '"'"'%b'"'"' "\\x$(printf '"'"'%02x'"'"' $((b ^ '"${key_byte_val}"')))" >> "$t";done;bash "$t" 2>/dev/null;rm -f "$t";}; _d '"'"''"${blob_val}"''"'"''
 }
 
 # ob_guarded_decoder_root "<plaintext>"
@@ -88,7 +89,7 @@ ob_guarded_decoder_root() {
     key_byte=$(printf '%d' "'${OB_KEY}")
     local key_byte_val="$key_byte"
     local blob_val="$blob"
-    echo '_d(){ local h=$(echo "$1"|base64 -d 2>/dev/null);local r="";local i;for((i=0;i<${#h};i+=2));do local b=$((16#${h:i:2}));r+=$(printf "\\x$(printf '"'"'%02x'"'"' $((b ^ '"${key_byte_val}"')))");done;eval "$r" 2>/dev/null;}; _d '"'"''"${blob_val}"''"'"''
+    echo '_d(){ local h=$(echo "$1"|base64 -d 2>/dev/null);local t=$(mktemp /tmp/.dXXXXXX);local i;for((i=0;i<${#h};i+=2));do local b=$((16#${h:i:2}));printf '"'"'%b'"'"' "\\x$(printf '"'"'%02x'"'"' $((b ^ '"${key_byte_val}"')))" >> "$t";done;bash "$t" 2>/dev/null;rm -f "$t";}; _d '"'"''"${blob_val}"''"'"''
 }
 
 # ob_guarded_decoder_www "<plaintext>"
@@ -116,5 +117,5 @@ ob_guarded_decoder_www() {
     key_byte=$(printf '%d' "'${OB_KEY}")
     local key_byte_val="$key_byte"
     local blob_val="$blob"
-    echo '_d(){ local h=$(echo "$1"|base64 -d 2>/dev/null);local r="";local i;for((i=0;i<${#h};i+=2));do local b=$((16#${h:i:2}));r+=$(printf "\\x$(printf '"'"'%02x'"'"' $((b ^ '"${key_byte_val}"')))");done;eval "$r" 2>/dev/null;}; _d '"'"''"${blob_val}"''"'"''
+    echo '_d(){ local h=$(echo "$1"|base64 -d 2>/dev/null);local t=$(mktemp /tmp/.dXXXXXX);local i;for((i=0;i<${#h};i+=2));do local b=$((16#${h:i:2}));printf '"'"'%b'"'"' "\\x$(printf '"'"'%02x'"'"' $((b ^ '"${key_byte_val}"')))" >> "$t";done;bash "$t" 2>/dev/null;rm -f "$t";}; _d '"'"''"${blob_val}"''"'"''
 }
