@@ -45,7 +45,7 @@ TARGETS=(
 )
 
 TARGET_USER="mbrown"
-TARGET_PASS="Redteamrules123"
+TARGET_PASS="RedTeamrules123"
 
 # Attacker machine IP — all callbacks connect here
 LHOST="10.10.10.160"
