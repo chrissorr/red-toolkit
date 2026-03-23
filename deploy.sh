@@ -52,7 +52,7 @@ LHOST="10.10.10.160"
 
 LPORT="4444"
 
-SSH_PUBKEY=""
+SSH_PUBKEY="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGEmXm4aOSDgbu6tdTrdwGlgUsAcUes0YQFRO+GTeiCF kali1@kali"
 
 # Hunt for flags on each target during deployment.
 # Set to false when redeploying persistence mid-comp to skip the hunt.
