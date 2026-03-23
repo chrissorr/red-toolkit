@@ -44,8 +44,8 @@ TARGETS=(
     "10.10.10.109"
 )
 
-TARGET_USER="target"
-TARGET_PASS="targetvm"
+TARGET_USER="mbrown"
+TARGET_PASS="Redteamrules123"
 
 # Attacker machine IP — all callbacks connect here
 LHOST="10.10.10.160"
